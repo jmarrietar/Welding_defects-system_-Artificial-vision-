@@ -1,0 +1,264 @@
+%%%%%%%%%%%%%%%Entrega1%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%---------------------------------------------------- 
+%BW=Bwareaopen(img_3,6,8) % PARA EIMINAR OBJETOS DE UN TAMAÑO TAL 
+
+%%%%%%%%%%%%%%%Entrega2%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%=================================
+
+%PREPROCESAMIENTO Y SEGMENTACION
+%Aqui realizar preprocesamiento mostrado arriba 
+
+%Cargar imagen segmentada (o mejor el .mat con la imagen)
+%i=imread('C:\Users\JosePortatil\Dropbox\9 Semestre\Vision Artificial\imagenes_segment\4.png');
+%i=rgb2gray(i);
+I=imresize(I,0.7); %%Cambiar el parametro
+Ialt=imresize(Ialt,0.7);  %INTENTAR PROBANDO CON ESTO REDUCIR COMPUTO! Y PROBAR ENTONCES LO DE ABAJO  // Cambiar el parametro
+im=Ialt; 
+im=255-im;     % ES NECESARIO HACER ESTO PARA CLASIFICAR
+im = im2bw(i,0.4);
+
+
+%¿HACER UN DILATE TALVEZ ????? Para ver mejor en el etiquetado. 
+%conectar componentes
+[L, n] = bwlabel(im,4); %%,,, 8 o 4 ??  % La imagen de entrada debe ser binaria
+imshow(L, [ ]);
+
+%Parte Humana
+[d,D] = Bio_labelregion(im,L,2); %2 maximo numero de clases 1(Si es salpicadura) 0(No es salpicadura)
+%Se guardan d (clasificacion ideal )
+save('d.mat')
+
+%EXTRAER CARACTERISTICAS
+ % Características GEOMËTRICAS (requieren una imagen etiquetada)
+%clear op
+%clear b 
+b(1).name = 'basicgeo'; b(1).options.show=1;
+b(2).name = 'hugeo'; b(2).options.show=1;
+b(3).name = 'flusser'; b(3).options.show=1;
+b(4).name = 'moments'; b(4).options.show=1; b(4).options.central=0;b(4).options.rs = [0 0; 1 0; 0 1];
+b(5).name = 'fourierdes'; b(5).options.show=1;  b(5).options.Nfourierdes=4;
+b(6).name = 'gupta'; b(6).options.show=1; % Bien
+%b(7).name = 'fitellipse'; b(7).options.show=1; % Explicar porque quite esto 
+
+%===================
+%Probare Moments Individual 
+%b(1).name = 'moments'; b(1).options.show=1; b(1).options.central=0;b(1).options.rs = [0 0; 1 0; 0 1]; %Bien
+
+%Probare Momentos de Gupta Individualmente 
+%b(1).name = 'gupta'; b(1).options.show=1; % Bien
+
+%Probare Fourierdes Individualmente 
+%b(1).name = 'fourierdes'; b(1).options.show=1;  b(1).options.Nfourierdes=4; %Bien
+%====================
+op.b = b;
+[X1,X1n] = Bfx_geo(L, op);
+
+% Características e INTENSIDAD (requieren una imagen en nieveles de gris)
+%COLOCAR AQUI LAS DE INTENSIDAD DE NIVELES DE GRIS Y DESPUES UNIRLAS CON LAS DE ARRIBA
+
+
+    b = [];  
+    b(1).name = 'basicint'; b(1).options.show=1;  
+    b(2).name = 'huint';    b(2).options.show=1;
+	%Mas abajo hay mas !
+	%NO HARALICK , no fourier en intensidad
+	%si lbp, ->Vecindario de parametro 
+	
+	%===================
+	
+%Probare Gabor individualmenet  ( MUY DEMORADO) 
+    b(3).name = 'gabor'; b(3).options.show=1; % Poner demas para metros 
+	   b(3).options.Lgabor  = 8;                 % number of rotations
+       b(3).options.Sgabor  = 8;                 % number of dilations (scale)
+       b(3).options.fhgabor = 2;                 % highest frequency of interest
+       b(3).options.flgabor = 0.1;               % lowest frequency of interest
+       b(3).options.Mgabor  = 21;                % mask size
+	
+Probare DCT individualmenet 
+ b(4).name = 'dct';  b(1).options.Ndct  = 64;                % imresize vertical
+        b(4).options.Mdct  = 64;                % imresize horizontal
+        b(4).options.mdct  = 2;                 % imresize frequency vertical
+        b(4).options.ndct  = 2;                 % imresize frequency horizontal
+        b(4).options.show    = 1;               % display results % Poner demas para metros 
+%Probare LBP individualmenet 
+
+ b(5).name = 'lbp'; b(1).options.vdiv = 1;                  % one vertical divition
+       b(5).options.hdiv = 1;                  % one horizontal divition
+       b(5).options.semantic = 1;              % semantic LBP
+       b(5).options.samples = 8;               % number of neighbor samples
+       b(5).options.sk      = 0.25;            % angle sampling
+       b(5).options.weight  = 9;               % angle sampling
+
+%Probare contrast  Individualmente 
+ b(6).name = 'contrast';   b(6).options.show    = 1;                    % display results
+        b(6).options.neighbor = 2;                   % neigborhood is imdilate
+        b(6).options.param    = 5;                   % with 5x5 mask
+ 
+%====================
+	clear op;  
+    op.b = b;
+    op.colstr = 'G';
+    [X2,X2n] = Bfx_int(I, L, op); % I es la imagen en escala de Gris 
+
+    X  = [X1 X2];
+    Xn = [X1n; X2n]; 
+
+	
+	
+%SELECCION DE CARACTERISTICAS-> Para esto Hacerlo con las X toatales
+
+% Se probaran distintos metodos y distintos numero de caracteristicas para escoger el mejor. 
+% Se probara entonces los metodo SFS , PCA y  probaremos su desempeño para clasificar. 
+%Se desea limpiar entonces las caracteristicas , quitando las que esten correlacionadas o sean constantes. 
+
+%X-> Debe ser la X creada con las imagenes de prueba!. 
+
+sclean=Bfs_clean(X,1); %Indice de las características seleccionadas.
+fclean=X(:,sclean);   % Caracteriticas seleccionadas. 
+fnclean=Xn(sclean,:); %Listado de los nombres de caracteristicas 
+
+% Se llenara una matriz A con los los desmpeños de separacion de las n=1,2,4,8,10,20 carateristicas.
+ A=ones(1,8);
+ B=[1,2,4,8,10,20,22,25]; 
+for i=1:6
+X=fclean; 
+Xn=fnclean; 
+
+
+%--------------------------------------
+% “Sequential forward feature selection (SFS)” 
+ %Se define op: 
+clear b 
+clear op
+clear p 
+op.b.name ='fisher'
+op.m=B(i)               %IMPORTANTE: caracteristicas n=1,2,4,8,10,20.
+op.show=1 
+selec=Bfs_sfs(X,d,op)   % Ver resultados (indices de las caracteristicas)
+
+% Se grafica cuando  n =2 
+%Bio_plotfeatures(f(:,selec),d,fn(selec,:))
+%
+X=X(:,selec);  % Se seleccionan las caracteristicas con las que se trabajara. 
+op.p = [];
+%probar el desempeño de la selección con los distintos n
+%usando un clasificador LDA sobre el mismo conjunto de datos %
+ds = Bcl_lda(X,d,X,op);   
+p = Bev_performance(d,ds)*100   % Sacar performance 
+A(i)=A(i)*p; 
+X=fclean; 
+Xn=fnclean; 
+end 
+ 
+
+%------------------------------------
+% “Principal component analysis (PCA)”
+%En esta primera parte se eliminaran caracteristicas correlacionadas.
+
+sclean=Bfs_clean(X,1); %Indice de las características seleccionadas.
+fclean=X(:,sclean);   % Caracteriticas seleccionadas. 
+fnclean=Xn(sclean,:); %Listado de los nombres de caracteristicas 
+
+% Se llenara una matriz A con los los desmpeños de separacion de las n=1,2,4,8,10,15 componentes principales
+ A=ones(1,8);
+ B=[1,2,4,8,10,20,22,25]; 
+for i=1:6
+X=fclean; 
+Xn=fnclean; 
+
+Bft_pca(X,B(i));  %Cambiar Aqui n =1,2,4,8,10
+%Lo normalizaremos 
+Bft_norm(ans,0);
+%Lo almacenaremos en XPCA
+XPCA=ans;
+
+
+op.p = [];
+ds = Bcl_lda(XPCA,d,XPCA,op);  
+p = Bev_performance(d,ds)*100
+
+A(i)=A(i)*p; 
+end 
+
+%PLSR 
+
+
+ A=ones(1,8);
+ B=[1,2,4,8,10,20,22,25]; 
+for i=1:6
+X=fclean; 
+Xn=fnclean; 
+
+        T = Bft_plsr(X,d,B(i));  
+
+        op.p = [];
+        ds = Bcl_lda(T,d,T,op);
+        p = Bev_performance(d,ds)*100
+			A(i)=A(i)*p; 
+			
+
+end
+
+
+%CLASIFICACION
+% Aqui se probaran distintos clasificadores usando  entonces Las mejores 22 caracteristicas seleccionadas por SFS
+% Hacer metodo para que llene la Matriz 
+Se probaran entonces distintos clasificadores 
+
+op.b.name ='fisher'
+op.m=22               %n=22
+op.show=1 
+selec=Bfs_sfs(X,d,op)   % Ver resultados (indices de las caracteristicas)
+
+X=X(:,selec);  % Se seleccionan las caracteristicas con las que se trabajara. 
+
+b(1).name = 'lda';   b(1).options.p = [];                        % LDA
+b(2).name = 'maha';  b(2).options = [];                          % Mahalanobis distance
+b(3).name = 'qda';   b(3).options.p = [];                        % QDA
+b(4).name = 'nnglm'; b(4).options.method = 3; b(4).options.iter = 10; % Nueral network ERROR
+b(5).name = 'knn';   b(5).options.k = 3;                              % KNN with 3 neighbors
+b(6).name = 'knn';   b(6).options.k = 5;                              % KNN with 5 neighbors
+
+op.strat=1; op.b = b; op.v = 10; op.show = 1; op.c = 0.95;        	  % 10 groups cross-validation
+[p,ci] = Bev_crossval(X,d,op);    
+
+
+%Matriz de confusion
+%Bds_stratify
+
+% De mi X de entrenamiento voy a hacer las matrices de confusion, separando en dos tipos Train & Test 
+%Para esto se usara entonces un 75% para preubas y un 25% para test. 
+ [X1,d1,X2,d2] = Bds_stratify(New_X,d,0.75); 
+ 
+%Con los datos de entrenamiento se generan y entrenan estos clasificadores
+ b(1).name = 'lda';   b(1).options.p = [];                        % LDA
+b(2).name = 'maha';  b(2).options = [];                          % Mahalanobis distance
+b(3).name = 'qda';   b(3).options.p = [];                        % QDA
+b(4).name = 'nnglm'; b(4).options.method = 3; b(4).options.iter = 10; % Nueral network ERROR
+b(5).name = 'knn';   b(5).options.k = 3;                              % KNN with 3 neighbors
+b(6).name = 'knn';   b(6).options.k = 5;                              % KNN with 5 neighbors
+ 
+opc = Bcl_structure(X1, d1, b);  %Corregir la X
+
+%Ahora debemos evaluar los clasificadores en el conjunto de datos de prueba así:
+ds = Bcl_structure(X2, opc);
+
+% En test 
+
+[T, p] = Bev_confusion(d2, ds(:,1)) %LDA
+
+[T, p] = Bev_confusion(d2, ds(:,2)) %Mahalanobis
+
+[T, p] = Bev_confusion(d2, ds(:,3)) %QDA
+
+[T, p] = Bev_confusion(d2, ds(:,4)) %Nueral network
+
+[T, p] = Bev_confusion(d2, ds(:,5)) % KNN with 3 neighbors
+
+[T, p] = Bev_confusion(d2, ds(:,6)) % KNN with 5 neighbors
+
+
